@@ -1,7 +1,7 @@
 {
   "name": "asm-ts",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -10,13 +10,21 @@
   },
   "dependencies": {
     "expo": "~53.0.9",
+    "expo-constants": "^17.1.6",
+    "expo-linking": "^7.1.5",
+    "expo-router": "^5.0.7",
     "expo-status-bar": "~2.2.3",
+    "lottie-react-native": "^7.2.2",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-native": "0.79.2",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-responsive-screen": "^1.4.2",
+    "react-native-vector-icons": "^10.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
+    "babel-plugin-module-resolver": "^5.0.2",
     "typescript": "~5.8.3"
   },
   "private": true
