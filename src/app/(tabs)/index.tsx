@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,103 +6,111 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  ImageSourcePropType,
+  ActivityIndicator,
+  TextInput,
 } from "react-native";
+import Feather from "@expo/vector-icons/Feather";
+import { useNavigation } from "@react-navigation/native";
+
+interface Category {
+  name: string;
+  description: string;
+  _id: string;
+}
 
 interface Recipe {
-  id: string;
-  title: string;
-  image?: ImageSourcePropType;
+  _id: string;
+  name: string;
+  imageUrl: string;
   time?: string;
   difficulty?: string;
   calories?: string;
+  categories: Category[];
+  __v?: number;
 }
-
 const Home = () => {
   const [activeCategory, setActiveCategory] = useState("All");
-  const categories = ["All", "Breakfast", "Main Course", "Soup"];
+  const [needToTryRecipes, setNeedToTryRecipes] = useState<Recipe[]>([]);
+  const [popularRecipes, setPopularRecipes] = useState<Recipe[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const needToTryRecipes: Recipe[] = [
-    {
-      id: "1",
-      title: "Leek & kale hash with sage fried eggs",
-      time: "1h",
-      difficulty: "Easy",
-      calories: "431 Kcal",
-      image: require("@assets/images/healthysalad.png"),
-    },
-    {
-      id: "2",
-      title: "Onion & Chard Rustic and easy",
-      time: "45m",
-      difficulty: "Medium",
-      calories: "320 Kcal",
-      image: require("@assets/images/potatoe.png"),
-    },
-    {
-      id: "3",
-      title: "Leek & kale hash with sage fried eggs",
-      time: "1h",
-      difficulty: "Easy",
-      calories: "431 Kcal",
-      image: require("@assets/images/healthysalad.png"),
-    },
-    {
-      id: "4",
-      title: "Leek & kale hash with sage fried eggs",
-      time: "1h",
-      difficulty: "Easy",
-      calories: "431 Kcal",
-      image: require("@assets/images/healthysalad.png"),
-    },
-  ];
+  const navigation = useNavigation();
 
-  const weeklyRecipes: Recipe[] = [
-    {
-      id: "3",
-      title: "Spicy Chicken Stir-fry",
-      image: require("@assets/images/desert.png"),
-      time: "30m",
-      difficulty: "Medium",
-      calories: "450 Kcal",
-    },
-    {
-      id: "4",
-      title: "Vegetable Soup",
-      image: require("@assets/images/pasta.png"),
-      time: "40m",
-      difficulty: "Easy",
-      calories: "230 Kcal",
-    },
-    {
-      id: "8",
-      title: "Spicy Chicken Stir-fry",
-      image: require("@assets/images/desert.png"),
-      time: "30m",
-      difficulty: "Medium",
-      calories: "450 Kcal",
-    },
-    {
-      id: "9",
-      title: "Spicy Chicken Stir-fry",
-      image: require("@assets/images/desert.png"),
-      time: "30m",
-      difficulty: "Medium",
-      calories: "450 Kcal",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [categoriesRes, needRes, popularRes] = await Promise.all([
+          fetch("http://10.0.2.2:8080/api/recipes/categories"),
+          fetch("http://10.0.2.2:8080/api/recipes"),
+          fetch("http://10.0.2.2:8080/api/recipes"),
+        ]);
+
+        const categoriesData = await categoriesRes.json();
+        const needData = await needRes.json();
+        const popularData = await popularRes.json();
+
+        const categoryNames = categoriesData.map(
+          (category: Category) => category.name
+        );
+        setCategories(["All", ...categoryNames]);
+        setNeedToTryRecipes(needData);
+        setPopularRecipes(popularData);
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error("Fetch error:", error.message);
+        } else {
+          console.error("Fetch error:", error);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
   };
 
+  const handleRecipePress = (recipeId: string) => {
+    // navigation.navigate("RecipeDetail", { recipeId });
+  };
+  const filteredNeedToTryRecipes =
+    activeCategory === "All"
+      ? needToTryRecipes
+      : needToTryRecipes.filter((recipe) =>
+          recipe.categories.some((category) => category.name === activeCategory)
+        );
+
+  const filteredPopularRecipes =
+    activeCategory === "All"
+      ? popularRecipes
+      : popularRecipes.filter((recipe) =>
+          recipe.categories.some((category) => category.name === activeCategory)
+        );
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fa8c16" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Your Personal Digital Cookbook</Text>
+      <Text style={styles.title}>Your Personal Digital Cookbook</Text>
+      <Text style={styles.greetingUser}>Hello User</Text>
+      <View style={styles.searchContainer}>
+        <TextInput placeholder="Search recipes..." style={styles.searchInput} />
+        <Feather
+          name="search"
+          size={24}
+          color="black"
+          style={styles.searchIcon}
+        />
       </View>
-
-      {/* Categories */}
       <View style={styles.categories}>
         {categories.map((category) => (
           <TouchableOpacity
@@ -118,29 +126,28 @@ const Home = () => {
         ))}
       </View>
 
-      {/* Need to try section */}
-      <Text style={styles.sectionTitle}>Need to try (14 recipes)</Text>
-      <View style={{ marginBottom: 20 }}>
-        <FlatList
-          horizontal
-          data={needToTryRecipes}
-          renderItem={({ item }) => (
-            <View style={styles.recipeCard}>
-              <Image source={item.image} style={styles.recipeImage} />
-              <Text style={styles.recipeTitle}>{item.title}</Text>
-              <View style={styles.recipeDetails}>
-                <Text style={styles.detailText}>{item.time}</Text>
-                <Text style={styles.detailText}>{item.difficulty}</Text>
-                <Text style={styles.detailText}>{item.calories}</Text>
-              </View>
+      <Text style={styles.sectionTitle}>Need to try</Text>
+      <FlatList
+        horizontal
+        data={filteredNeedToTryRecipes}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.recipeCard}
+            onPress={() => handleRecipePress(item._id)}
+          >
+            <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
+            <Text style={styles.recipeTitle}>{item.name}</Text>
+            <View style={styles.recipeDetails}>
+              <Text style={styles.detailText}>{item.time}</Text>
+              <Text style={styles.detailText}>{item.difficulty}</Text>
+              <Text style={styles.detailText}>{item.calories}</Text>
             </View>
-          )}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
+          </TouchableOpacity>
+        )}
+        showsHorizontalScrollIndicator={false}
+      />
 
-      {/* Today’s Tip */}
       <View style={styles.tipContainer}>
         <Text style={styles.tipTitle}>💡 Today’s Tip</Text>
         <Text style={styles.tipText}>
@@ -149,21 +156,21 @@ const Home = () => {
         </Text>
       </View>
 
-      {/* Popular Recipes */}
       <Text style={styles.sectionTitle}>Popular recipes</Text>
       <FlatList
         horizontal
-        data={weeklyRecipes}
+        data={popularRecipes}
+        keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <View style={styles.popularRecipeCard}>
-            <Image source={item.image} style={styles.popularRecipeImage} />
-            <View style={styles.popularRecipeInfo}>
-              <Text style={styles.popularRecipeTitle}>{item.title}</Text>
-              <Text style={styles.popularRecipeCalories}>{item.calories}</Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={styles.recipeCard}
+            onPress={() => handleRecipePress(item._id)}
+          >
+            <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
+            <Text style={styles.recipeTitle}>{item.name}</Text>
+            <Text style={styles.detailText}>{item.calories}</Text>
+          </TouchableOpacity>
         )}
-        keyExtractor={(item) => item.id}
         showsHorizontalScrollIndicator={false}
       />
     </View>
@@ -174,20 +181,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    marginTop: 30,
+    marginTop: 60,
     padding: 10,
   },
-  header: {
-    marginBottom: 20,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 10,
   },
+  greetingUser: {
+    margin: 10,
+    color: "black",
+  },
   categories: {
     flexDirection: "row",
-    justifyContent: "flex-start",
     marginBottom: 20,
   },
   categoryButton: {
@@ -224,9 +236,8 @@ const styles = StyleSheet.create({
   },
   recipeImage: {
     width: "100%",
-    height: 120,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+    height: 140,
+    resizeMode: "cover",
   },
   recipeTitle: {
     fontSize: 14,
@@ -237,29 +248,20 @@ const styles = StyleSheet.create({
   recipeDetails: {
     flexDirection: "row",
     justifyContent: "center",
-    width: "100%",
     position: "absolute",
     bottom: 10,
-    alignItems: "center",
+    width: "100%",
   },
   detailText: {
     fontSize: 12,
     color: "#666",
     marginHorizontal: 5,
-    textAlign: "center",
   },
   tipContainer: {
     backgroundColor: "#fff3e0",
     borderRadius: 12,
     padding: 15,
-    marginTop: 0,
     marginVertical: 10,
-    marginHorizontal: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tipTitle: {
     fontSize: 16,
@@ -272,38 +274,29 @@ const styles = StyleSheet.create({
     color: "#333",
     lineHeight: 20,
   },
-  popularRecipeCard: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
-    borderRadius: 15,
-    backgroundColor: "#f5f5f5",
-    overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  popularRecipeImage: {
-    width: "100%",
-    height: 120,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-  },
-  popularRecipeInfo: {
-    padding: 10,
+  searchContainer: {
+    flexDirection: "row",
     alignItems: "center",
+    borderColor: "#ccc",
+    backgroundColor: "#E6E6E6",
+    borderWidth: 1,
+    borderRadius: 20,
+    marginBottom: 15,
+    position: "relative",
   },
-  popularRecipeTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
+  searchInput: {
+    height: 45,
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingLeft: 10,
   },
-  popularRecipeCalories: {
-    fontSize: 14,
-    color: "#666",
+  searchIcon: {
+    borderWidth: 5,
+    borderColor: "white",
+    backgroundColor: "white",
+    borderRadius: 20,
+    marginLeft: 10,
+    marginRight: 8,
   },
 });
 
