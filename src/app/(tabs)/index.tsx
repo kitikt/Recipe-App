@@ -8,10 +8,12 @@ import {
   Image,
   ActivityIndicator,
   TextInput,
+  ScrollView,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 
+// Định nghĩa interface cho dữ liệu
 interface Category {
   name: string;
   description: string;
@@ -26,17 +28,56 @@ interface Recipe {
   difficulty?: string;
   calories?: string;
   categories: Category[];
-  __v?: number;
 }
+
+// Component hiển thị thẻ recipe
+const RecipeCard = ({
+  item,
+  showDetails = false,
+  onPress,
+}: {
+  item: Recipe;
+  showDetails?: boolean;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={styles.recipeCard} onPress={onPress}>
+    <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
+    <View style={styles.cardContent}>
+      <Text style={styles.recipeTitle} numberOfLines={2}>
+        {item.name}
+      </Text>
+      {showDetails && (
+        <View style={styles.recipeDetails}>
+          {item.time && (
+            <Text style={styles.detailText}>
+              <Feather name="clock" size={12} color="#ff8c00" /> {item.time}
+            </Text>
+          )}
+          {item.difficulty && (
+            <Text style={styles.detailText}>
+              <Feather name="trending-up" size={12} color="#4ecdc4" />{" "}
+              {item.difficulty}
+            </Text>
+          )}
+        </View>
+      )}
+      {item.calories && (
+        <Text style={styles.caloriesText}>{item.calories} Kcal</Text>
+      )}
+    </View>
+  </TouchableOpacity>
+);
+
+// Component chính
 const Home = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [needToTryRecipes, setNeedToTryRecipes] = useState<Recipe[]>([]);
   const [popularRecipes, setPopularRecipes] = useState<Recipe[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const navigation = useNavigation();
-
+  // Fetch dữ liệu từ API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -50,18 +91,14 @@ const Home = () => {
         const needData = await needRes.json();
         const popularData = await popularRes.json();
 
-        const categoryNames = categoriesData.map(
-          (category: Category) => category.name
-        );
-        setCategories(["All", ...categoryNames]);
+        setCategories([
+          "All",
+          ...categoriesData.map((cat: Category) => cat.name),
+        ]);
         setNeedToTryRecipes(needData);
         setPopularRecipes(popularData);
       } catch (error) {
-        if (error instanceof Error) {
-          console.error("Fetch error:", error.message);
-        } else {
-          console.error("Fetch error:", error);
-        }
+        console.error("Fetch error:", error);
       } finally {
         setLoading(false);
       }
@@ -70,48 +107,89 @@ const Home = () => {
     fetchData();
   }, []);
 
+  // Xử lý nhấn vào category
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
   };
 
+  // Xử lý nhấn vào recipe
   const handleRecipePress = (recipeId: string) => {
-    // navigation.navigate("RecipeDetail", { recipeId });
+    router.push({
+      pathname: "/recipe/[id]",
+      params: { id: recipeId },
+    });
   };
-  const filteredNeedToTryRecipes =
-    activeCategory === "All"
-      ? needToTryRecipes
-      : needToTryRecipes.filter((recipe) =>
-          recipe.categories.some((category) => category.name === activeCategory)
-        );
 
-  const filteredPopularRecipes =
-    activeCategory === "All"
-      ? popularRecipes
-      : popularRecipes.filter((recipe) =>
-          recipe.categories.some((category) => category.name === activeCategory)
-        );
+  const filterRecipes = (
+    recipes: Recipe[],
+    category: string,
+    query: string
+  ) => {
+    return recipes.filter((recipe) => {
+      const matchesCategory =
+        category === "All" ||
+        recipe.categories?.some((c) => c.name === category);
+      const matchesSearch =
+        query === "" || recipe.name.toLowerCase().includes(query.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  };
+
+  const filteredNeedToTryRecipes = filterRecipes(
+    needToTryRecipes,
+    activeCategory,
+    searchQuery
+  );
+  const filteredPopularRecipes = filterRecipes(
+    popularRecipes,
+    activeCategory,
+    searchQuery
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fa8c16" />
+        <ActivityIndicator size="large" color="#ff8c00" />
+        <Text style={styles.loadingText}>Loading recipes...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Your Personal Digital Cookbook</Text>
-      <Text style={styles.greetingUser}>Hello User</Text>
+    <ScrollView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Digital Cookbook</Text>
+        <Text style={styles.greeting}>Hello User 👋</Text>
+      </View>
+
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <TextInput placeholder="Search recipes..." style={styles.searchInput} />
         <Feather
           name="search"
-          size={24}
-          color="black"
+          size={20}
+          color="#999"
           style={styles.searchIcon}
         />
+        <TextInput
+          placeholder="Search recipes..."
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Feather name="x" size={20} color="#999" />
+          </TouchableOpacity>
+        )}
       </View>
-      <View style={styles.categories}>
+
+      {/* Categories */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoriesContainer}
+      >
         {categories.map((category) => (
           <TouchableOpacity
             key={category}
@@ -121,182 +199,226 @@ const Home = () => {
             ]}
             onPress={() => handleCategoryPress(category)}
           >
-            <Text style={styles.categoryText}>{category}</Text>
+            <Text
+              style={[
+                styles.categoryText,
+                activeCategory === category && styles.activeCategoryText,
+              ]}
+            >
+              {category}
+            </Text>
           </TouchableOpacity>
         ))}
+      </ScrollView>
+
+      {/* Need to Try Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Need to Try</Text>
+        {searchQuery === "" && filteredNeedToTryRecipes.length === 0 ? (
+          <Text style={styles.noResultsText}>
+            No recipes available. Try another category.
+          </Text>
+        ) : (
+          <FlatList
+            horizontal
+            data={filteredNeedToTryRecipes}
+            keyExtractor={(item) => item._id}
+            renderItem={({ item }) => (
+              <RecipeCard
+                item={item}
+                showDetails
+                onPress={() => handleRecipePress(item._id)}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            ListEmptyComponent={
+              searchQuery !== "" ? (
+                <Text style={styles.noResultsText}>
+                  No recipes found for "{searchQuery}".
+                </Text>
+              ) : null
+            }
+          />
+        )}
       </View>
 
-      <Text style={styles.sectionTitle}>Need to try</Text>
-      <FlatList
-        horizontal
-        data={filteredNeedToTryRecipes}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.recipeCard}
-            onPress={() => handleRecipePress(item._id)}
-          >
-            <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
-            <Text style={styles.recipeTitle}>{item.name}</Text>
-            <View style={styles.recipeDetails}>
-              <Text style={styles.detailText}>{item.time}</Text>
-              <Text style={styles.detailText}>{item.difficulty}</Text>
-              <Text style={styles.detailText}>{item.calories}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        showsHorizontalScrollIndicator={false}
-      />
-
+      {/* Today's Tip */}
       <View style={styles.tipContainer}>
-        <Text style={styles.tipTitle}>💡 Today’s Tip</Text>
+        <Text style={styles.tipTitle}>💡 Today's Tip</Text>
         <Text style={styles.tipText}>
-          Drink a glass of water 30 minutes before your meal – it may help
-          reduce calorie intake and boost metabolism.
+          Drink water 30 minutes before meals to reduce calorie intake.
         </Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Popular recipes</Text>
-      <FlatList
-        horizontal
-        data={popularRecipes}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.recipeCard}
-            onPress={() => handleRecipePress(item._id)}
-          >
-            <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
-            <Text style={styles.recipeTitle}>{item.name}</Text>
-            <Text style={styles.detailText}>{item.calories}</Text>
-          </TouchableOpacity>
+      {/* Popular Recipes Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Popular Recipes</Text>
+        {searchQuery === "" && filteredPopularRecipes.length === 0 ? (
+          <Text style={styles.noResultsText}>
+            No popular recipes available. Try another category.
+          </Text>
+        ) : (
+          <FlatList
+            horizontal
+            data={filteredPopularRecipes}
+            keyExtractor={(item) => item._id}
+            renderItem={({ item }) => (
+              <RecipeCard
+                item={item}
+                onPress={() => handleRecipePress(item._id)}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            ListEmptyComponent={
+              searchQuery !== "" ? (
+                <Text style={styles.noResultsText}>
+                  No popular recipes found for "{searchQuery}".
+                </Text>
+              ) : null
+            }
+          />
         )}
-        showsHorizontalScrollIndicator={false}
-      />
-    </View>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    marginTop: 60,
-    padding: 10,
+    backgroundColor: "#f5f5f5",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  header: {
+    marginTop: 50,
+    padding: 20,
+    backgroundColor: "#ff8c00",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 10,
+    color: "white",
   },
-  greetingUser: {
-    margin: 10,
-    color: "black",
-  },
-  categories: {
-    flexDirection: "row",
-    marginBottom: 20,
-  },
-  categoryButton: {
-    padding: 10,
-    marginRight: 15,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
-  activeCategory: {
-    backgroundColor: "#faebd7",
-  },
-  categoryText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  recipeCard: {
-    width: 200,
-    height: 200,
-    marginRight: 10,
-    borderRadius: 15,
-    backgroundColor: "#f5f5f5",
-    overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  recipeImage: {
-    width: "100%",
-    height: 140,
-    resizeMode: "cover",
-  },
-  recipeTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginVertical: 5,
-    paddingHorizontal: 5,
-  },
-  recipeDetails: {
-    flexDirection: "row",
-    justifyContent: "center",
-    position: "absolute",
-    bottom: 10,
-    width: "100%",
-  },
-  detailText: {
-    fontSize: 12,
-    color: "#666",
-    marginHorizontal: 5,
-  },
-  tipContainer: {
-    backgroundColor: "#fff3e0",
-    borderRadius: 12,
-    padding: 15,
-    marginVertical: 10,
-  },
-  tipTitle: {
+  greeting: {
     fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-    color: "#ff8c00",
-  },
-  tipText: {
-    fontSize: 14,
-    color: "#333",
-    lineHeight: 20,
+    color: "white",
+    marginTop: 5,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderColor: "#ccc",
-    backgroundColor: "#E6E6E6",
-    borderWidth: 1,
-    borderRadius: 20,
-    marginBottom: 15,
-    position: "relative",
-  },
-  searchInput: {
-    height: 45,
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingLeft: 10,
-  },
-  searchIcon: {
-    borderWidth: 5,
-    borderColor: "white",
     backgroundColor: "white",
     borderRadius: 20,
-    marginLeft: 10,
-    marginRight: 8,
+    margin: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  categoriesContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  categoryButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: "white",
+  },
+  activeCategory: {
+    backgroundColor: "#ff8c00",
+  },
+  categoryText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  activeCategoryText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  section: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+  },
+  recipeCard: {
+    width: 200,
+    marginRight: 15,
+    borderRadius: 15,
+    backgroundColor: "white",
+  },
+  recipeImage: {
+    width: "100%",
+    height: 120,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+  },
+  cardContent: {
+    padding: 10,
+  },
+  recipeTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  recipeDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 5,
+  },
+  detailText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  caloriesText: {
+    fontSize: 12,
+    color: "#ff8c00",
+  },
+  tipContainer: {
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 15,
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#ff8c00",
+    marginBottom: 5,
+  },
+  tipText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    marginVertical: 10,
   },
 });
 
