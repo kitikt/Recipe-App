@@ -24,7 +24,7 @@ interface Recipe {
   _id: string;
   name: string;
   imageUrl: string;
-  time?: string;
+  cookTime?: string;
   difficulty?: string;
   calories?: string;
   categories: Category[];
@@ -48,9 +48,9 @@ const RecipeCard = ({
       </Text>
       {showDetails && (
         <View style={styles.recipeDetails}>
-          {item.time && (
+          {item.cookTime && (
             <Text style={styles.detailText}>
-              <Feather name="clock" size={12} color="#ff8c00" /> {item.time}
+              <Feather name="clock" size={12} color="#ff8c00" /> {item.cookTime}
             </Text>
           )}
           {item.difficulty && (
@@ -68,7 +68,6 @@ const RecipeCard = ({
   </TouchableOpacity>
 );
 
-// Component chính
 const Home = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [needToTryRecipes, setNeedToTryRecipes] = useState<Recipe[]>([]);
