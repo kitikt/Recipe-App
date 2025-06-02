@@ -1,4 +1,3 @@
-// src/components/Timer.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -55,8 +54,7 @@ const Timer = ({ time, onComplete }: TimerProps) => {
 
   return (
     <View style={styles.timerContainer}>
-      <Text style={styles.timerText}>{formatTime(seconds) || "0:00"}</Text>
-      {/* Thêm fallback */}
+      <Text style={styles.timerText}>{formatTime(seconds)}</Text>
       <TouchableOpacity style={styles.timerButton} onPress={toggleTimer}>
         <Feather name={isActive ? "pause" : "play"} size={20} color="#fff" />
         <Text style={styles.timerButtonText}>
