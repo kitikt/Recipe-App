@@ -1,4 +1,3 @@
-// src/app/recipe/[id].tsx
 import {
   View,
   Text,
@@ -10,10 +9,11 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState, useRef } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Timer from "@components/timer";
 
 const { width } = Dimensions.get("window");
@@ -28,6 +28,7 @@ interface Recipe {
   description?: string;
   ingredients?: string[];
   instructions?: string;
+  categories?: { name: string }[];
 }
 
 const RecipeDetail = () => {
@@ -35,6 +36,7 @@ const RecipeDetail = () => {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTimer, setShowTimer] = useState(true);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -77,6 +79,45 @@ const RecipeDetail = () => {
 
     if (id) fetchRecipe();
   }, [id]);
+
+  // Check favorite status when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const checkFavorite = async () => {
+        try {
+          const storedFavorites = await AsyncStorage.getItem("likedRecipes");
+          const favoriteIds: string[] = storedFavorites
+            ? JSON.parse(storedFavorites)
+            : [];
+          setIsFavorited(favoriteIds.includes(id as string));
+        } catch (error) {
+          console.error("Error checking favorite status:", error);
+        }
+      };
+      checkFavorite();
+    }, [id])
+  );
+
+  // Toggle favorite status
+  const toggleFavorite = async () => {
+    try {
+      const storedFavorites = await AsyncStorage.getItem("likedRecipes");
+      let favoriteIds: string[] = storedFavorites
+        ? JSON.parse(storedFavorites)
+        : [];
+
+      if (isFavorited) {
+        favoriteIds = favoriteIds.filter((idItem) => idItem !== id);
+      } else {
+        favoriteIds.push(id as string);
+      }
+
+      await AsyncStorage.setItem("likedRecipes", JSON.stringify(favoriteIds));
+      setIsFavorited(!isFavorited);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
 
   // Animate ingredients when they appear
   const animateIngredient = (index: number) => {
@@ -135,7 +176,7 @@ const RecipeDetail = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Image Section with Gradient Overlay */}
+      {/* Hero Image Section with Gradient Overlay and Favorite Button */}
       <Animated.View
         style={[
           styles.imageContainer,
@@ -150,6 +191,18 @@ const RecipeDetail = () => {
             <Feather name="arrow-left" size={20} color="#fff" />
             <Text style={styles.backButtonText}>Back</Text>
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={toggleFavorite}
+        >
+          <Feather
+            name="heart"
+            size={24}
+            color={isFavorited ? "#ff4757" : "#fff"}
+            fill={isFavorited ? "#ff4757" : "none"}
+          />
         </TouchableOpacity>
 
         <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
@@ -167,6 +220,9 @@ const RecipeDetail = () => {
             ]}
           >
             <Text style={styles.title}>{recipe.name}</Text>
+            <Text style={styles.categoryText}>
+              {recipe.categories?.map((cat) => cat.name).join(", ") || "N/A"}
+            </Text>
           </Animated.View>
         </LinearGradient>
       </Animated.View>
@@ -241,6 +297,7 @@ const RecipeDetail = () => {
             </Animated.View>
           )}
         </View>
+
         {/* Timer Section */}
         {recipe.cookTime && (
           <Animated.View
@@ -263,25 +320,18 @@ const RecipeDetail = () => {
               {!showTimer && (
                 <TouchableOpacity
                   style={styles.timerStartButton}
-                  onPress={() => {
-                    setShowTimer(true);
-                  }}
+                  onPress={() => setShowTimer(true)}
                 >
                   <Text style={styles.timerStartText}>Start Timer</Text>
                 </TouchableOpacity>
               )}
             </View>
             {showTimer && (
-              <>
-                <Timer
-                  time={recipe.cookTime}
-                  onComplete={handleTimerComplete}
-                />
-              </>
+              <Timer time={recipe.cookTime} onComplete={handleTimerComplete} />
             )}
           </Animated.View>
         )}
-        {/* Description Section with Glass Effect */}
+
         {recipe.description && (
           <Animated.View
             style={[
@@ -306,6 +356,7 @@ const RecipeDetail = () => {
             </View>
           </Animated.View>
         )}
+
         {/* Ingredients Section with Animated Items */}
         {recipe.ingredients?.length && (
           <Animated.View
@@ -371,7 +422,7 @@ const RecipeDetail = () => {
             </View>
           </Animated.View>
         )}
-        {/* Instructions Section with Glass Effect */}
+
         {recipe.instructions && (
           <Animated.View
             style={[
@@ -485,6 +536,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  categoryText: {
+    fontSize: 16,
+    color: "#ddd",
+    textAlign: "center",
+    marginTop: 8,
+  },
   backButton: {
     position: "absolute",
     top: 50,
@@ -506,6 +563,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginLeft: 8,
     fontWeight: "500",
+  },
+  favoriteButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   contentContainer: {
     paddingHorizontal: 20,
