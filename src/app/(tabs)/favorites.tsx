@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 interface FavoriteRecipe {
   _id: string;
@@ -28,63 +29,63 @@ const FavoritesScreen = () => {
   const [favoriteRecipes, setFavoriteRecipes] = useState<FavoriteRecipe[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchFavorites = async () => {
-      try {
-        setLoading(true);
-        const storedFavorites = await AsyncStorage.getItem("likedRecipes");
-        const favoriteIds: string[] = storedFavorites
-          ? JSON.parse(storedFavorites)
-          : [];
+  const fetchFavorites = useCallback(async () => {
+    try {
+      setLoading(true);
+      const storedFavorites = await AsyncStorage.getItem("likedRecipes");
+      const favoriteIds: string[] = storedFavorites
+        ? JSON.parse(storedFavorites)
+        : [];
 
-        if (favoriteIds.length === 0) {
-          setFavoriteRecipes([]);
-          setLoading(false);
-          return;
-        }
-
-        const recipePromises = favoriteIds.map((id: string) =>
-          fetch(`http://10.0.2.2:8080/api/recipes/${id}`).then((res) => {
-            if (!res.ok) {
-              throw new Error(`Failed to fetch recipe with ID ${id}`);
-            }
-            return res.json();
-          })
-        );
-
-        const recipes = await Promise.all(recipePromises);
-        setFavoriteRecipes(
-          recipes.map((recipe: any) => ({
-            _id: recipe._id,
-            name: recipe.name,
-            imageUrl: recipe.imageUrl,
-            cookTime: recipe.cookTime,
-            difficulty: recipe.difficulty,
-            calories: recipe.calories,
-            categories:
-              recipe.categories?.map((cat: any) =>
-                typeof cat === "string" ? cat : cat.name
-              ) || [],
-          }))
-        );
-      } catch (error) {
-        console.error("Error fetching favorite recipes:", error);
+      if (favoriteIds.length === 0) {
         setFavoriteRecipes([]);
-      } finally {
         setLoading(false);
+        return;
       }
-    };
 
-    fetchFavorites();
+      const recipePromises = favoriteIds.map((id: string) =>
+        fetch(`http://10.0.2.2:8080/api/recipes/${id}`).then((res) => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch recipe with ID ${id}`);
+          }
+          return res.json();
+        })
+      );
+
+      const recipes = await Promise.all(recipePromises);
+      setFavoriteRecipes(
+        recipes.map((recipe: any) => ({
+          _id: recipe._id,
+          name: recipe.name,
+          imageUrl: recipe.imageUrl,
+          cookTime: recipe.cookTime,
+          difficulty: recipe.difficulty,
+          calories: recipe.calories,
+          categories:
+            recipe.categories?.map((cat: any) =>
+              typeof cat === "string" ? cat : cat.name
+            ) || [],
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching favorite recipes:", error);
+      setFavoriteRecipes([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchFavorites();
+    }, [fetchFavorites])
+  );
 
   const removeFavorite = async (recipeId: string) => {
     try {
-      // Update the local state
       setFavoriteRecipes((prev) =>
         prev.filter((recipe) => recipe._id !== recipeId)
       );
-      // Update AsyncStorage
       const storedFavorites = await AsyncStorage.getItem("likedRecipes");
       const favoriteIds: string[] = storedFavorites
         ? JSON.parse(storedFavorites)

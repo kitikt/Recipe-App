@@ -13,7 +13,7 @@ import {
 import Feather from "@expo/vector-icons/Feather";
 import { router } from "expo-router";
 
-// Định nghĩa interface cho dữ liệu
+// Define interfaces for data
 interface Category {
   name: string;
   description: string;
@@ -30,7 +30,7 @@ interface Recipe {
   categories: Category[];
 }
 
-// Component hiển thị thẻ recipe
+// Component to display recipe card (removed favorite logic)
 const RecipeCard = ({
   item,
   showDetails = false,
@@ -39,34 +39,37 @@ const RecipeCard = ({
   item: Recipe;
   showDetails?: boolean;
   onPress: () => void;
-}) => (
-  <TouchableOpacity style={styles.recipeCard} onPress={onPress}>
-    <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
-    <View style={styles.cardContent}>
-      <Text style={styles.recipeTitle} numberOfLines={2}>
-        {item.name}
-      </Text>
-      {showDetails && (
-        <View style={styles.recipeDetails}>
-          {item.cookTime && (
-            <Text style={styles.detailText}>
-              <Feather name="clock" size={12} color="#ff8c00" /> {item.cookTime}
-            </Text>
-          )}
-          {item.difficulty && (
-            <Text style={styles.detailText}>
-              <Feather name="trending-up" size={12} color="#4ecdc4" />{" "}
-              {item.difficulty}
-            </Text>
-          )}
-        </View>
-      )}
-      {item.calories && (
-        <Text style={styles.caloriesText}>{item.calories} Kcal</Text>
-      )}
-    </View>
-  </TouchableOpacity>
-);
+}) => {
+  return (
+    <TouchableOpacity style={styles.recipeCard} onPress={onPress}>
+      <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
+      <View style={styles.cardContent}>
+        <Text style={styles.recipeTitle} numberOfLines={2}>
+          {item.name}
+        </Text>
+        {showDetails && (
+          <View style={styles.recipeDetails}>
+            {item.cookTime && (
+              <Text style={styles.detailText}>
+                <Feather name="clock" size={12} color="#ff8c00" />{" "}
+                {item.cookTime}
+              </Text>
+            )}
+            {item.difficulty && (
+              <Text style={styles.detailText}>
+                <Feather name="trending-up" size={12} color="#4ecdc4" />{" "}
+                {item.difficulty}
+              </Text>
+            )}
+          </View>
+        )}
+        {item.calories && (
+          <Text style={styles.caloriesText}>{item.calories} Kcal</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const Home = () => {
   const [activeCategory, setActiveCategory] = useState("All");
@@ -76,7 +79,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch dữ liệu từ API
+  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -106,12 +109,12 @@ const Home = () => {
     fetchData();
   }, []);
 
-  // Xử lý nhấn vào category
+  // Handle category press
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
   };
 
-  // Xử lý nhấn vào recipe
+  // Handle recipe press
   const handleRecipePress = (recipeId: string) => {
     router.push({
       pathname: "/recipe/[id]",
@@ -368,6 +371,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
     borderRadius: 15,
     backgroundColor: "white",
+    position: "relative",
   },
   recipeImage: {
     width: "100%",
