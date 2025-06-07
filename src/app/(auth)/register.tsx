@@ -1,4 +1,4 @@
-// src/app/(auth)/login.tsx
+// src/app/(auth)/register.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -11,27 +11,43 @@ import {
 import { router } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 
-const LoginScreen = () => {
+const RegisterScreen = () => {
+  const [username, setUsername] = useState(""); // Sử dụng username thay vì name
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { register } = useAuth();
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
+    if (!username.trim() || !email.trim() || !password.trim()) {
+      Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin.");
+      return;
+    }
+
     try {
-      await login(email, password);
-      router.replace("/(tabs)");
+      await register(username, email, password);
+      Alert.alert("Thành công", "Đăng ký thành công! Vui lòng đăng nhập.", [
+        { text: "OK", onPress: () => router.replace("/(auth)/login") },
+      ]);
     } catch (error) {
       Alert.alert(
         "Lỗi",
-        "Thông tin đăng nhập không chính xác. Vui lòng thử lại."
+        error instanceof Error
+          ? error.message
+          : "Đăng ký thất bại. Vui lòng thử lại."
       );
-      console.error("Login error:", error);
+      console.error("Registration error:", error);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Đăng Nhập</Text>
+      <Text style={styles.title}>Đăng Ký</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Tên người dùng"
+        value={username}
+        onChangeText={setUsername}
+      />
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -47,11 +63,11 @@ const LoginScreen = () => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Đăng Nhập</Text>
+      <TouchableOpacity style={styles.button} onPress={handleRegister}>
+        <Text style={styles.buttonText}>Đăng Ký</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-        <Text style={styles.link}>Chưa có tài khoản? Đăng ký</Text>
+      <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+        <Text style={styles.link}>Đã có tài khoản? Đăng nhập</Text>
       </TouchableOpacity>
     </View>
   );
@@ -94,4 +110,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default RegisterScreen;

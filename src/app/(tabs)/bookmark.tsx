@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/screens/BookmarksScreen.tsx
+import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,10 +12,10 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback } from "react";
+import { router, useFocusEffect, Redirect } from "expo-router";
+import { useAuth } from "context/AuthContext";
 
-interface FavoriteRecipe {
+interface BookmarkRecipe {
   _id: string;
   name: string;
   imageUrl: string;
@@ -24,37 +25,67 @@ interface FavoriteRecipe {
   categories: string[];
 }
 
-const FavoritesScreen = () => {
+const BookmarksScreen = () => {
+  const { user, isLoading: authLoading } = useAuth(); // Get user and auth loading state
   const [searchQuery, setSearchQuery] = useState("");
-  const [favoriteRecipes, setFavoriteRecipes] = useState<FavoriteRecipe[]>([]);
+  const [bookmarkedRecipes, setBookmarkedRecipes] = useState<BookmarkRecipe[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
-  const fetchFavorites = useCallback(async () => {
+  // Redirect to login if the user is not authenticated
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#ff4757" />
+        <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+  const fetchBookmarks = useCallback(async () => {
     try {
       setLoading(true);
-      const storedFavorites = await AsyncStorage.getItem("likedRecipes");
-      const favoriteIds: string[] = storedFavorites
-        ? JSON.parse(storedFavorites)
+      const storedBookmarks = await AsyncStorage.getItem("bookmarkedRecipes");
+      const bookmarkIds: string[] = storedBookmarks
+        ? JSON.parse(storedBookmarks)
         : [];
 
-      if (favoriteIds.length === 0) {
-        setFavoriteRecipes([]);
+      if (bookmarkIds.length === 0) {
+        setBookmarkedRecipes([]);
         setLoading(false);
         return;
       }
 
-      const recipePromises = favoriteIds.map((id: string) =>
-        fetch(`http://10.0.2.2:8080/api/recipes/${id}`).then((res) => {
-          if (!res.ok) {
-            throw new Error(`Failed to fetch recipe with ID ${id}`);
-          }
-          return res.json();
-        })
+      const recipePromises = bookmarkIds.map((id: string) =>
+        fetch(`http://10.0.2.2:8080/api/recipes/${id}`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error(`Failed to fetch recipe with ID ${id}`);
+            }
+            return res.json();
+          })
+          .catch((error) => {
+            return null; // Bỏ qua ID lỗi
+          })
       );
 
-      const recipes = await Promise.all(recipePromises);
-      setFavoriteRecipes(
-        recipes.map((recipe: any) => ({
+      const responses = await Promise.all(recipePromises);
+      const validRecipes = responses.filter((recipe) => recipe !== null);
+      const validIds = validRecipes.map((recipe) => recipe._id);
+
+      if (validIds.length < bookmarkIds.length) {
+        await AsyncStorage.setItem(
+          "bookmarkedRecipes",
+          JSON.stringify(validIds)
+        );
+      }
+
+      setBookmarkedRecipes(
+        validRecipes.map((recipe: any) => ({
           _id: recipe._id,
           name: recipe.name,
           imageUrl: recipe.imageUrl,
@@ -68,43 +99,45 @@ const FavoritesScreen = () => {
         }))
       );
     } catch (error) {
-      console.error("Error fetching favorite recipes:", error);
-      setFavoriteRecipes([]);
+      console.error("Error fetching bookmarked recipes:", error);
+      setBookmarkedRecipes([]);
+      alert(
+        "Không thể tải danh sách bookmark. Vui lòng kiểm tra kết nối hoặc thử lại sau!"
+      );
     } finally {
       setLoading(false);
     }
   }, []);
-
   useFocusEffect(
     useCallback(() => {
-      fetchFavorites();
-    }, [fetchFavorites])
+      fetchBookmarks();
+    }, [fetchBookmarks])
   );
 
-  const removeFavorite = async (recipeId: string) => {
+  const removeBookmark = async (recipeId: string) => {
     try {
-      setFavoriteRecipes((prev) =>
+      setBookmarkedRecipes((prev) =>
         prev.filter((recipe) => recipe._id !== recipeId)
       );
-      const storedFavorites = await AsyncStorage.getItem("likedRecipes");
-      const favoriteIds: string[] = storedFavorites
-        ? JSON.parse(storedFavorites)
+      const storedBookmarks = await AsyncStorage.getItem("bookmarkedRecipes");
+      const bookmarkIds: string[] = storedBookmarks
+        ? JSON.parse(storedBookmarks)
         : [];
-      const updatedFavorites = favoriteIds.filter((id) => id !== recipeId);
+      const updatedBookmarks = bookmarkIds.filter((id) => id !== recipeId);
       await AsyncStorage.setItem(
-        "likedRecipes",
-        JSON.stringify(updatedFavorites)
+        "bookmarkedRecipes",
+        JSON.stringify(updatedBookmarks)
       );
     } catch (error) {
-      console.error("Error removing favorite:", error);
+      console.error("Error removing bookmark:", error);
     }
   };
 
-  const filteredRecipes = favoriteRecipes.filter((recipe) =>
+  const filteredRecipes = bookmarkedRecipes.filter((recipe) =>
     recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const FavoriteCard = ({ item }: { item: FavoriteRecipe }) => (
+  const BookmarkCard = ({ item }: { item: BookmarkRecipe }) => (
     <TouchableOpacity
       style={styles.recipeCard}
       onPress={() =>
@@ -113,10 +146,10 @@ const FavoritesScreen = () => {
     >
       <Image source={{ uri: item.imageUrl }} style={styles.recipeImage} />
       <TouchableOpacity
-        style={styles.favoriteButton}
-        onPress={() => removeFavorite(item._id)}
+        style={styles.bookmarkButton}
+        onPress={() => removeBookmark(item._id)}
       >
-        <Feather name="heart" size={18} color="#ff4757" fill="#ff4757" />
+        <Feather name="bookmark" size={18} color="#ff4757" fill="#ff4757" />
       </TouchableOpacity>
 
       <View style={styles.cardContent}>
@@ -158,7 +191,7 @@ const FavoritesScreen = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#ff4757" />
-        <Text style={styles.loadingText}>Loading favorites...</Text>
+        <Text style={styles.loadingText}>Đang tải bookmarks...</Text>
       </View>
     );
   }
@@ -167,10 +200,9 @@ const FavoritesScreen = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Your Favorites</Text>
+        <Text style={styles.title}>Công Thức Đã Lưu</Text>
         <Text style={styles.subtitle}>
-          {favoriteRecipes.length} saved recipe
-          {favoriteRecipes.length !== 1 ? "s" : ""}
+          {bookmarkedRecipes.length} công thức đã lưu
         </Text>
       </View>
 
@@ -183,7 +215,7 @@ const FavoritesScreen = () => {
           style={styles.searchIcon}
         />
         <TextInput
-          placeholder="Search your favorites..."
+          placeholder="Tìm kiếm công thức đã lưu..."
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -195,21 +227,20 @@ const FavoritesScreen = () => {
         )}
       </View>
 
-      {/* Favorites List */}
-      {favoriteRecipes.length === 0 ? (
+      {/* Bookmarks List */}
+      {bookmarkedRecipes.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Feather name="heart" size={64} color="#ddd" />
-          <Text style={styles.emptyTitle}>No favorites yet</Text>
+          <Feather name="bookmark" size={64} color="#ddd" />
+          <Text style={styles.emptyTitle}>Chưa có bookmark</Text>
           <Text style={styles.emptySubtitle}>
-            Start exploring recipes and tap the heart icon to save your
-            favorites!
+            Hãy khám phá công thức và nhấn biểu tượng bookmark để lưu!
           </Text>
         </View>
       ) : (
         <FlatList
           data={filteredRecipes}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <FavoriteCard item={item} />}
+          renderItem={({ item }) => <BookmarkCard item={item} />}
           numColumns={2}
           contentContainerStyle={styles.listContainer}
           columnWrapperStyle={styles.row}
@@ -217,7 +248,7 @@ const FavoritesScreen = () => {
             searchQuery !== "" ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.noResultsText}>
-                  No favorites found for "{searchQuery}"
+                  Không tìm thấy bookmark cho "{searchQuery}"
                 </Text>
               </View>
             ) : null
@@ -308,7 +339,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 15,
     borderTopRightRadius: 15,
   },
-  favoriteButton: {
+  bookmarkButton: {
     position: "absolute",
     top: 8,
     right: 8,
@@ -358,7 +389,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   categoryTagText: {
-    fontSize: 10,
     color: "#666",
   },
   emptyContainer: {
@@ -388,4 +418,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FavoritesScreen;
+export default BookmarksScreen;

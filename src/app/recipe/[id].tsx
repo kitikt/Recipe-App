@@ -85,13 +85,15 @@ const RecipeDetail = () => {
     useCallback(() => {
       const checkFavorite = async () => {
         try {
-          const storedFavorites = await AsyncStorage.getItem("likedRecipes");
+          const storedFavorites = await AsyncStorage.getItem(
+            "bookmarkedRecipes"
+          );
           const favoriteIds: string[] = storedFavorites
             ? JSON.parse(storedFavorites)
             : [];
           setIsFavorited(favoriteIds.includes(id as string));
         } catch (error) {
-          console.error("Error checking favorite status:", error);
+          console.error("Error checking bookmark status:", error);
         }
       };
       checkFavorite();
@@ -101,7 +103,7 @@ const RecipeDetail = () => {
   // Toggle favorite status
   const toggleFavorite = async () => {
     try {
-      const storedFavorites = await AsyncStorage.getItem("likedRecipes");
+      const storedFavorites = await AsyncStorage.getItem("bookmarkedRecipes");
       let favoriteIds: string[] = storedFavorites
         ? JSON.parse(storedFavorites)
         : [];
@@ -112,7 +114,10 @@ const RecipeDetail = () => {
         favoriteIds.push(id as string);
       }
 
-      await AsyncStorage.setItem("likedRecipes", JSON.stringify(favoriteIds));
+      await AsyncStorage.setItem(
+        "bookmarkedRecipes",
+        JSON.stringify(favoriteIds)
+      );
       setIsFavorited(!isFavorited);
     } catch (error) {
       console.error("Error toggling favorite:", error);
@@ -198,7 +203,7 @@ const RecipeDetail = () => {
           onPress={toggleFavorite}
         >
           <Feather
-            name="heart"
+            name="bookmark"
             size={24}
             color={isFavorited ? "#ff4757" : "#fff"}
             fill={isFavorited ? "#ff4757" : "none"}
@@ -245,6 +250,7 @@ const RecipeDetail = () => {
                 styles.statCard,
                 {
                   transform: [{ scale: scaleAnim }],
+                  borderRadius: 40,
                 },
               ]}
             >
@@ -587,13 +593,14 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+    borderRadius: 40,
   },
   statGradient: {
     padding: 20,
-    borderRadius: 20,
     alignItems: "center",
     minHeight: 160,
     justifyContent: "center",
+    borderRadius: 40,
   },
   statIcon: {
     fontSize: 28,

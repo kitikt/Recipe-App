@@ -15,6 +15,8 @@ import { Picker } from "@react-native-picker/picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
+import { useAuth } from "../../context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface Category {
   _id: string;
@@ -34,8 +36,9 @@ interface RecipeInput {
 }
 
 const PlusScreen = () => {
+  const { user, isLoading } = useAuth(); // Sử dụng isLoading từ useAuth
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Giữ lại state loading
   const [submitting, setSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<RecipeInput>({
@@ -44,18 +47,18 @@ const PlusScreen = () => {
     cookTime: "",
     difficulty: "",
     calories: "",
-    ingredients: [""],
+    ingredients: ["1"], // Đặt giá trị mặc định để tránh lỗi
     instructions: "",
     categoryIds: [],
   });
   const [newIngredient, setNewIngredient] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
-  // Fetch categories from API
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await fetch("http://10.0.2.2:8080/api/recipes/categories");
+        if (!res.ok) throw new Error("Failed to fetch categories");
         const data = await res.json();
         setCategories(data);
         if (data.length > 0) setSelectedCategory(data[0]._id);
@@ -63,34 +66,43 @@ const PlusScreen = () => {
         console.error("Error fetching categories:", error);
         Alert.alert("Error", "Failed to load categories. Please try again.");
       } finally {
-        setLoading(false);
+        setLoading(false); // Cập nhật loading khi xong
       }
     };
     fetchCategories();
   }, []);
 
+  // Kiểm tra quyền truy cập khi component mount
+  useEffect(() => {
+    if (!isLoading && (!user || user.role !== "admin")) {
+      Alert.alert("Unauthorized", "You must be an admin to add recipes.");
+      router.replace("/(tabs)"); // Chuyển về trang tabs
+    }
+  }, [user, isLoading]);
+
   const pickImage = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert("Permission to access camera roll is required!");
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Permission Denied",
+        "Permission to access media library is required!"
+      );
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setImageUri(result.assets[0].uri);
     }
   };
 
-  // Handle ingredient input
   const handleAddIngredient = () => {
     if (newIngredient.trim()) {
       setRecipe({
@@ -108,8 +120,13 @@ const PlusScreen = () => {
     });
   };
 
-  // Handle form submission
   const handleSubmit = async () => {
+    if (!user || !user.token) {
+      Alert.alert("Error", "You need to log in to add a recipe.");
+      router.replace("/(auth)/login");
+      return;
+    }
+
     if (!recipe.name.trim()) {
       Alert.alert("Error", "Recipe name is required.");
       return;
@@ -142,29 +159,46 @@ const PlusScreen = () => {
     try {
       const formData = new FormData();
       formData.append("name", recipe.name);
-      formData.append("description", recipe.description);
-      formData.append("cookTime", recipe.cookTime);
+      formData.append("description", recipe.description || "");
+      const normalizedCookTime = /^\d+$/.test(recipe.cookTime.trim())
+        ? `${recipe.cookTime.trim()} mins`
+        : recipe.cookTime.trim();
+      formData.append("cookTime", normalizedCookTime);
       formData.append("difficulty", recipe.difficulty || "Easy");
       formData.append("calories", recipe.calories);
       formData.append("ingredients", JSON.stringify(validIngredients));
       formData.append("instructions", recipe.instructions);
-      formData.append("categoryIds", selectedCategory);
 
-      if (image) {
-        const imageUriParts = image.split(".");
+      const selectedCategoryData = categories.find(
+        (cat) => cat._id === selectedCategory
+      );
+      if (selectedCategoryData) {
+        formData.append(
+          "category",
+          JSON.stringify({
+            _id: selectedCategoryData._id,
+            name: selectedCategoryData.name,
+            description: selectedCategoryData.description || "",
+          })
+        );
+      }
+
+      if (imageUri) {
+        const imageUriParts = imageUri.split(".");
         const fileType = imageUriParts[imageUriParts.length - 1];
         formData.append("image", {
-          uri: image,
+          uri: imageUri,
           name: `recipe.${fileType}`,
           type: `image/${fileType}`,
         } as any);
       }
 
+      console.log("Sending request with token:", user.token);
       const response = await fetch("http://10.0.2.2:8080/api/recipes", {
         method: "POST",
         body: formData,
         headers: {
-          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${user.token}`,
         },
       });
 
@@ -178,26 +212,39 @@ const PlusScreen = () => {
           cookTime: "",
           difficulty: "",
           calories: "",
-          ingredients: [""],
+          ingredients: ["1"],
           instructions: "",
           categoryIds: [],
         });
         setSelectedCategory(categories.length > 0 ? categories[0]._id : null);
         setNewIngredient("");
-        setImage(null);
+        setImageUri(null);
       } else {
         const errorData = await response.json();
-        Alert.alert("Error", errorData.message || "Failed to add recipe.");
+        console.log("Error response from server:", errorData);
+        if (
+          errorData.message === "No token provided" ||
+          errorData.message.includes("token")
+        ) {
+          Alert.alert("Error", "Session expired. Please log in again.");
+          await AsyncStorage.removeItem("user");
+          router.replace("/(auth)/login");
+        } else {
+          Alert.alert("Error", errorData.message || "Failed to add recipe.");
+        }
       }
     } catch (error) {
-      console.error("Error adding recipe:", error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.error("Submit error:", error);
+      Alert.alert(
+        "Error",
+        "Network error. Please check your connection and try again."
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <LinearGradient
@@ -213,7 +260,6 @@ const PlusScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
       <LinearGradient colors={["#ff9a56", "#ffad56"]} style={styles.header}>
         <Text style={styles.headerTitle}>Add New Recipe</Text>
         <Text style={styles.headerSubtitle}>
@@ -221,9 +267,7 @@ const PlusScreen = () => {
         </Text>
       </LinearGradient>
 
-      {/* Form */}
       <View style={styles.formContainer}>
-        {/* Recipe Name */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Recipe Name</Text>
           <TextInput
@@ -234,7 +278,6 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Description */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Description</Text>
           <TextInput
@@ -246,19 +289,17 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Image Picker */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Recipe Image (optional)</Text>
           <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
             <Feather name="image" size={24} color="#ff9a56" />
             <Text style={styles.imagePickerText}>Select Image</Text>
           </TouchableOpacity>
-          {image && (
-            <Image source={{ uri: image }} style={styles.imagePreview} />
+          {imageUri && (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
           )}
         </View>
 
-        {/* Cook Time */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Cook Time (e.g., 30 mins)</Text>
           <TextInput
@@ -269,7 +310,6 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Difficulty */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Difficulty (e.g., Easy)</Text>
           <TextInput
@@ -280,7 +320,6 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Calories */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Calories (e.g., 500)</Text>
           <TextInput
@@ -292,7 +331,6 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Categories */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Categories</Text>
           <View style={styles.pickerContainer}>
@@ -312,7 +350,6 @@ const PlusScreen = () => {
           </View>
         </View>
 
-        {/* Ingredients */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Ingredients</Text>
           {recipe.ingredients.map((ingredient, index) => (
@@ -353,7 +390,6 @@ const PlusScreen = () => {
           </View>
         </View>
 
-        {/* Instructions */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Instructions</Text>
           <TextInput
@@ -367,7 +403,6 @@ const PlusScreen = () => {
           />
         </View>
 
-        {/* Submit Button */}
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmit}

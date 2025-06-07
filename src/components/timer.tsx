@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 interface TimerProps {
-  time: string; // Định dạng: "10 minutes"
+  time: string;
   onComplete?: () => void;
 }
 
@@ -13,17 +13,24 @@ const Timer = ({ time, onComplete }: TimerProps) => {
 
   useEffect(() => {
     const parseTime = (timeStr: string) => {
-      const match = timeStr.match(/(\d+)\s*minutes?/i);
+      const match = timeStr.match(/(\d+)\s*(mins?|minutes?)/i);
       if (match) {
         const minutes = parseInt(match[1], 10);
+        return minutes * 60;
+      }
+      const numMatch = timeStr.match(/(\d+)/);
+      if (numMatch) {
+        const minutes = parseInt(numMatch[1], 10);
         return minutes * 60;
       }
       return 0;
     };
 
     if (time) {
-      const totalSeconds = parseTime(time);
-      setSeconds(totalSeconds);
+      const newSeconds = parseTime(time);
+      setSeconds(newSeconds);
+    } else {
+      setSeconds(0);
     }
   }, [time]);
 
