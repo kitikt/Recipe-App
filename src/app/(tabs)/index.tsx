@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 // Define interfaces for data
 interface Category {
@@ -78,37 +78,50 @@ const Home = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch data from API
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [categoriesRes, needRes, popularRes] = await Promise.all([
-          fetch("http://10.0.2.2:8080/api/recipes/categories"),
-          fetch("http://10.0.2.2:8080/api/recipes"),
-          fetch("http://10.0.2.2:8080/api/recipes"),
-        ]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        try {
+          setLoading(true);
+          setError(null);
 
-        const categoriesData = await categoriesRes.json();
-        const needData = await needRes.json();
-        const popularData = await popularRes.json();
+          const [categoriesRes, recipesRes] = await Promise.all([
+            fetch("http://10.0.2.2:8080/api/recipes/categories"),
+            fetch("http://10.0.2.2:8080/api/recipes"),
+          ]);
 
-        setCategories([
-          "All",
-          ...categoriesData.map((cat: Category) => cat.name),
-        ]);
-        setNeedToTryRecipes(needData);
-        setPopularRecipes(popularData);
-      } catch (error) {
-        console.error("Fetch error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+          const categoriesData = await categoriesRes.json();
+          setCategories([
+            "All",
+            ...categoriesData.map((cat: Category) => cat.name),
+          ]);
 
-    fetchData();
-  }, []);
+          const recipesData = await recipesRes.json();
+          setNeedToTryRecipes(recipesData);
+          setPopularRecipes(recipesData);
 
+          if (!recipesData || recipesData.length === 0) {
+            setError("Không có công thức nào để hiển thị.");
+          }
+        } catch (error) {
+          console.error("Fetch data error:", error);
+          setError("Lỗi khi tải dữ liệu. Vui lòng thử lại sau.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }, [])
+  );
+
+  React.useEffect(() => {
+    if (categories.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory("All");
+    }
+  }, [categories, activeCategory]);
   // Handle category press
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
