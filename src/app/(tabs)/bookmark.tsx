@@ -1,4 +1,4 @@
-// src/screens/BookmarksScreen.tsx
+// BookmarksScreen.tsx
 import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
@@ -26,30 +26,36 @@ interface BookmarkRecipe {
 }
 
 const BookmarksScreen = () => {
-  const { user, isLoading: authLoading } = useAuth(); // Get user and auth loading state
+  const { user, isLoading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const apiUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
   const [bookmarkedRecipes, setBookmarkedRecipes] = useState<BookmarkRecipe[]>(
     []
   );
   const [loading, setLoading] = useState(true);
 
-  // Redirect to login if the user is not authenticated
-  if (authLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#ff4757" />
-        <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
-      </View>
-    );
-  }
+  // Hàm tạo key bookmark dựa trên user
+  const getBookmarkKey = useCallback(() => {
+    return user ? `bookmarkedRecipes_${user.id}` : null;
+  }, [user]);
 
-  if (!user) {
-    return <Redirect href="/(auth)/login" />;
-  }
   const fetchBookmarks = useCallback(async () => {
+    if (!user || !apiUrl) {
+      setBookmarkedRecipes([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const storedBookmarks = await AsyncStorage.getItem("bookmarkedRecipes");
+      const bookmarkKey = getBookmarkKey();
+      if (!bookmarkKey) {
+        setBookmarkedRecipes([]);
+        setLoading(false);
+        return;
+      }
+
+      const storedBookmarks = await AsyncStorage.getItem(bookmarkKey);
       const bookmarkIds: string[] = storedBookmarks
         ? JSON.parse(storedBookmarks)
         : [];
@@ -61,7 +67,9 @@ const BookmarksScreen = () => {
       }
 
       const recipePromises = bookmarkIds.map((id: string) =>
-        fetch(`http://10.0.2.2:8080/api/recipes/${id}`)
+        fetch(`${apiUrl}/api/recipes/${id}`, {
+          headers: user ? { Authorization: `Bearer ${user.token}` } : {},
+        })
           .then((res) => {
             if (!res.ok) {
               throw new Error(`Failed to fetch recipe with ID ${id}`);
@@ -78,10 +86,7 @@ const BookmarksScreen = () => {
       const validIds = validRecipes.map((recipe) => recipe._id);
 
       if (validIds.length < bookmarkIds.length) {
-        await AsyncStorage.setItem(
-          "bookmarkedRecipes",
-          JSON.stringify(validIds)
-        );
+        await AsyncStorage.setItem(bookmarkKey, JSON.stringify(validIds));
       }
 
       setBookmarkedRecipes(
@@ -101,33 +106,45 @@ const BookmarksScreen = () => {
     } catch (error) {
       console.error("Error fetching bookmarked recipes:", error);
       setBookmarkedRecipes([]);
-      alert(
-        "Không thể tải danh sách bookmark. Vui lòng kiểm tra kết nối hoặc thử lại sau!"
-      );
+      alert("Không thể tải danh sách bookmark. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, apiUrl]);
+
   useFocusEffect(
     useCallback(() => {
       fetchBookmarks();
     }, [fetchBookmarks])
   );
 
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#ff4757" />
+        <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   const removeBookmark = async (recipeId: string) => {
     try {
+      const bookmarkKey = getBookmarkKey();
+      if (!bookmarkKey) return;
+
       setBookmarkedRecipes((prev) =>
         prev.filter((recipe) => recipe._id !== recipeId)
       );
-      const storedBookmarks = await AsyncStorage.getItem("bookmarkedRecipes");
+      const storedBookmarks = await AsyncStorage.getItem(bookmarkKey);
       const bookmarkIds: string[] = storedBookmarks
         ? JSON.parse(storedBookmarks)
         : [];
       const updatedBookmarks = bookmarkIds.filter((id) => id !== recipeId);
-      await AsyncStorage.setItem(
-        "bookmarkedRecipes",
-        JSON.stringify(updatedBookmarks)
-      );
+      await AsyncStorage.setItem(bookmarkKey, JSON.stringify(updatedBookmarks));
     } catch (error) {
       console.error("Error removing bookmark:", error);
     }
@@ -259,6 +276,7 @@ const BookmarksScreen = () => {
   );
 };
 
+// (Styles giữ nguyên, không thay đổi)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
