@@ -112,10 +112,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = async () => {
-    setUser(null);
-    await AsyncStorage.removeItem("user");
+    try {
+      if (user) {
+        const bookmarkKey = `bookmarkedRecipes_${user.id}`;
+        await AsyncStorage.removeItem(bookmarkKey);
+      }
+      // Xóa thông tin user
+      setUser(null);
+      await AsyncStorage.removeItem("user");
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
   };
-
   return (
     <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
       {children}

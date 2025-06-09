@@ -14,13 +14,13 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#ff8c00",
-        tabBarInactiveTintColor: "#999",
+        tabBarActiveTintColor: "#333",
+        tabBarInactiveTintColor: "#44362F",
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#D9D9D9",
+          backgroundColor: "white",
           borderTopWidth: 1,
-          borderTopColor: "#e0e0e0",
+          borderTopColor: "#333",
         },
       }}
     >
@@ -30,7 +30,7 @@ export default function TabsLayout() {
           title: "Trang Chủ",
           tabBarLabel: "Trang Chủ",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
+            <Ionicons name="home-outline" color={color} size={size} />
           ),
         }}
       />
@@ -55,7 +55,18 @@ export default function TabsLayout() {
           tabBarItemStyle:
             user && user.role === "admin" && typeof user.role === "string"
               ? {}
-              : { display: "none" }, // Show if user is admin
+              : { display: "none" },
+        }}
+      />
+      <Tabs.Screen
+        name="chatbot"
+        options={{
+          title: "AI Chat",
+          tabBarLabel: "AI Chat",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubble-outline" color={color} size={size} />
+          ),
+          tabBarItemStyle: user ? {} : { display: "none" },
         }}
       />
       <Tabs.Screen

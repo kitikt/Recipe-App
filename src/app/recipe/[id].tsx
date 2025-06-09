@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -15,6 +18,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Timer from "@components/timer";
+import { useAuth } from "context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -25,33 +29,91 @@ interface Recipe {
   cookTime?: string;
   difficulty?: string;
   calories?: string;
+  comments?: Comment[];
   description?: string;
   ingredients?: string[];
   instructions?: string;
   categories?: { name: string }[];
 }
 
+interface Comment {
+  _id: string;
+  content: string;
+  user: { _id: string; name: string };
+  createdAt?: string;
+}
+
 const RecipeDetail = () => {
   const { id } = useLocalSearchParams();
+  const { user } = useAuth();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTimer, setShowTimer] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
 
-  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const ingredientAnims = useRef<Animated.Value[]>([]).current;
+  const apiUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
+  // Hàm tạo key động cho AsyncStorage
+  const getBookmarkKey = useCallback(() => {
+    return user ? `bookmarkedRecipes_${user.id}` : `bookmarkedRecipes_guest`;
+  }, [user]);
+
+  // Hàm kiểm tra trạng thái bookmark
+  const checkFavorite = useCallback(async () => {
+    try {
+      const bookmarkKey = getBookmarkKey();
+      const storedFavorites = await AsyncStorage.getItem(bookmarkKey);
+      const favoriteIds: string[] = storedFavorites
+        ? JSON.parse(storedFavorites)
+        : [];
+      setIsFavorited(favoriteIds.includes(id as string));
+    } catch (error) {
+      console.error("Error checking bookmark status:", error);
+    }
+  }, [id, getBookmarkKey]);
+
+  // Hàm toggle bookmark
+  const toggleFavorite = async () => {
+    try {
+      const bookmarkKey = getBookmarkKey();
+      const storedFavorites = await AsyncStorage.getItem(bookmarkKey);
+      let favoriteIds: string[] = storedFavorites
+        ? JSON.parse(storedFavorites)
+        : [];
+
+      const isCurrentlyFavorited = favoriteIds.includes(id as string);
+      if (isCurrentlyFavorited) {
+        favoriteIds = favoriteIds.filter((idItem) => idItem !== id);
+      } else {
+        favoriteIds.push(id as string);
+      }
+
+      await AsyncStorage.setItem(bookmarkKey, JSON.stringify(favoriteIds));
+      setIsFavorited(!isCurrentlyFavorited);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
+  // RecipeDetail.tsx
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
-        const res = await fetch(`http://10.0.2.2:8080/api/recipes/${id}`);
+        setLoading(true);
+        const res = await fetch(`${apiUrl}/api/recipes/${id}`, {
+          headers: user ? { Authorization: `Bearer ${user.token}` } : {},
+        });
+        if (!res.ok) {
+          throw new Error("Failed to fetch recipe");
+        }
         const data = await res.json();
         setRecipe(data);
 
-        // Start animations when data is loaded
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
@@ -77,54 +139,70 @@ const RecipeDetail = () => {
       }
     };
 
-    if (id) fetchRecipe();
-  }, [id]);
+    const fetchComments = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/comments/${id}`);
+        const data = await res.json();
+        setComments(data);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+      }
+    };
 
-  // Check favorite status when screen is focused
+    // Làm mới bookmark khi user thay đổi
+    if (id) {
+      fetchRecipe();
+      fetchComments();
+      checkFavorite();
+    }
+  }, [id, apiUrl, user, checkFavorite]); // Thêm user vào dependencies để làm mới khi user thay đổi
   useFocusEffect(
     useCallback(() => {
-      const checkFavorite = async () => {
-        try {
-          const storedFavorites = await AsyncStorage.getItem(
-            "bookmarkedRecipes"
-          );
-          const favoriteIds: string[] = storedFavorites
-            ? JSON.parse(storedFavorites)
-            : [];
-          setIsFavorited(favoriteIds.includes(id as string));
-        } catch (error) {
-          console.error("Error checking bookmark status:", error);
-        }
-      };
       checkFavorite();
-    }, [id])
+    }, [checkFavorite])
   );
 
-  // Toggle favorite status
-  const toggleFavorite = async () => {
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !user) {
+      console.log("Không thêm bình luận: Nội dung rỗng hoặc chưa đăng nhập");
+      return;
+    }
+
     try {
-      const storedFavorites = await AsyncStorage.getItem("bookmarkedRecipes");
-      let favoriteIds: string[] = storedFavorites
-        ? JSON.parse(storedFavorites)
-        : [];
+      const commentData = {
+        recipeId: id,
+        content: newComment,
+      };
 
-      if (isFavorited) {
-        favoriteIds = favoriteIds.filter((idItem) => idItem !== id);
+      const res = await fetch(`${apiUrl}/api/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify(commentData),
+      });
+      console.log("Response status:", res.status);
+      const data = await res.json();
+      console.log("Phản hồi từ server:", data);
+
+      if (res.ok) {
+        setComments([...comments, data]);
+        setNewComment("");
+        console.log("Thêm bình luận thành công!");
       } else {
-        favoriteIds.push(id as string);
+        console.error(
+          "Thêm bình luận thất bại:",
+          data.message || "Unknown error"
+        );
+        alert(data.message || "Failed to add comment");
       }
-
-      await AsyncStorage.setItem(
-        "bookmarkedRecipes",
-        JSON.stringify(favoriteIds)
-      );
-      setIsFavorited(!isFavorited);
     } catch (error) {
-      console.error("Error toggling favorite:", error);
+      console.error("Lỗi khi gửi yêu cầu thêm bình luận:", error);
+      alert("Lỗi khi thêm bình luận. Vui lòng thử lại!");
     }
   };
 
-  // Animate ingredients when they appear
   const animateIngredient = (index: number) => {
     if (!ingredientAnims[index]) {
       ingredientAnims[index] = new Animated.Value(0);
@@ -198,17 +276,19 @@ const RecipeDetail = () => {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={toggleFavorite}
-        >
-          <Feather
-            name="bookmark"
-            size={24}
-            color={isFavorited ? "#ff4757" : "#fff"}
-            fill={isFavorited ? "#ff4757" : "none"}
-          />
-        </TouchableOpacity>
+        {user && (
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={toggleFavorite}
+          >
+            <Feather
+              name="bookmark"
+              size={24}
+              color={isFavorited ? "#ff4757" : "#fff"}
+              fill={isFavorited ? "#ff4757" : "none"}
+            />
+          </TouchableOpacity>
+        )}
 
         <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
 
@@ -453,6 +533,66 @@ const RecipeDetail = () => {
             </View>
           </Animated.View>
         )}
+
+        {/* Comments Section */}
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: "center" }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.sectionHeader}>
+              <LinearGradient
+                colors={["#6a11cb", "#2575fc"]}
+                style={styles.sectionIconContainer}
+              >
+                <Text style={styles.sectionIcon}>🗨️</Text>
+              </LinearGradient>
+              <Text style={styles.sectionTitle}>Comments</Text>
+            </View>
+            <View style={styles.commentsContainer}>
+              {comments.length > 0 ? (
+                comments.map((comment, index) => (
+                  <View key={index} style={styles.commentItem}>
+                    <Text style={styles.commentUser}>{comment.user.name}</Text>
+                    <Text style={styles.commentContent}>{comment.content}</Text>
+                    {comment.createdAt && (
+                      <Text style={styles.commentTime}>
+                        {new Date(comment.createdAt).toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noCommentsText}>No comments yet.</Text>
+              )}
+              {user && (
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    style={styles.commentInput}
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    placeholder="Add a comment..."
+                  />
+                  <TouchableOpacity
+                    style={styles.postButton}
+                    onPress={handleAddComment}
+                  >
+                    <Text style={styles.postButtonText}>Post</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </Animated.View>
     </ScrollView>
   );
@@ -742,6 +882,68 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     color: "#444",
     fontWeight: "400",
+  },
+  commentsContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  commentItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  commentUser: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  commentContent: {
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+  },
+  commentTime: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 4,
+  },
+  noCommentsText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginVertical: 16,
+  },
+  commentInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 16,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 8,
+    marginRight: 8,
+  },
+  postButton: {
+    backgroundColor: "#ff9a56",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  postButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

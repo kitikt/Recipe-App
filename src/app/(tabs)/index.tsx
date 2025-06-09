@@ -30,7 +30,7 @@ interface Recipe {
   categories: Category[];
 }
 
-// Component to display recipe card (removed favorite logic)
+// Component to display recipe card (unchanged)
 const RecipeCard = ({
   item,
   showDetails = false,
@@ -79,7 +79,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
-
+  const apiUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
@@ -88,8 +88,8 @@ const Home = () => {
           setError(null);
 
           const [categoriesRes, recipesRes] = await Promise.all([
-            fetch("http://10.0.2.2:8080/api/recipes/categories"),
-            fetch("http://10.0.2.2:8080/api/recipes"),
+            fetch(`${apiUrl}/api/recipes/categories`),
+            fetch(`${apiUrl}/api/recipes`),
           ]);
 
           const categoriesData = await categoriesRes.json();
@@ -122,12 +122,11 @@ const Home = () => {
       setActiveCategory("All");
     }
   }, [categories, activeCategory]);
-  // Handle category press
+
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
   };
 
-  // Handle recipe press
   const handleRecipePress = (recipeId: string) => {
     router.push({
       pathname: "/recipe/[id]",
@@ -214,6 +213,10 @@ const Home = () => {
             ]}
             onPress={() => handleCategoryPress(category)}
           >
+            <Image
+              source={getCategoryImage(category)} // Sửa lại để dùng trực tiếp source
+              style={styles.categoryImage}
+            />
             <Text
               style={[
                 styles.categoryText,
@@ -298,6 +301,22 @@ const Home = () => {
   );
 };
 
+// Helper function to get category image based on category name
+const getCategoryImage = (category: string) => {
+  const images = {
+    All: require("../../assets/images/waiter.png"),
+    Lunch: require("../../assets/images/ramen.png"),
+    Dinner: require("../../assets/images/christmas-dinner.png"),
+    Dessert: require("../../assets/images/cake.png"),
+    Breakfast: require("../../assets/images/breakfast.png"),
+  };
+  return (
+    images[category as keyof typeof images] || {
+      uri: "https://example.com/default_icon.png",
+    }
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -316,7 +335,7 @@ const styles = StyleSheet.create({
   header: {
     marginTop: 50,
     padding: 20,
-    backgroundColor: "#ff8c00",
+    backgroundColor: "#BC8F8F",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
@@ -352,21 +371,26 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   categoryButton: {
-    paddingHorizontal: 15,
+    alignItems: "center",
     paddingVertical: 10,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: "white",
+    marginRight: 15,
   },
   activeCategory: {
-    backgroundColor: "#ff8c00",
+    borderBottomWidth: 2,
+    borderBottomColor: "#ff8c00",
+  },
+  categoryImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 5,
   },
   categoryText: {
     fontSize: 14,
     color: "#666",
   },
   activeCategoryText: {
-    color: "white",
+    color: "#ff8c00",
     fontWeight: "bold",
   },
   section: {
