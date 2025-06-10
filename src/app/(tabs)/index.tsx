@@ -198,7 +198,6 @@ const Home = () => {
         )}
       </View>
 
-      {/* Categories */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -207,16 +206,21 @@ const Home = () => {
         {categories.map((category) => (
           <TouchableOpacity
             key={category}
-            style={[
-              styles.categoryButton,
-              activeCategory === category && styles.activeCategory,
-            ]}
+            style={styles.categoryButton}
             onPress={() => handleCategoryPress(category)}
           >
-            <Image
-              source={getCategoryImage(category)} // Sửa lại để dùng trực tiếp source
-              style={styles.categoryImage}
-            />
+            <View
+              style={[
+                styles.categoryImageContainer,
+                activeCategory === category &&
+                  styles.activeCategoryImageContainer,
+              ]}
+            >
+              <Image
+                source={getCategoryImage(category)}
+                style={styles.categoryImage}
+              />
+            </View>
             <Text
               style={[
                 styles.categoryText,
@@ -228,7 +232,6 @@ const Home = () => {
           </TouchableOpacity>
         ))}
       </ScrollView>
-
       {/* Need to Try Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Need to Try</Text>
@@ -372,27 +375,36 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     alignItems: "center",
-    paddingVertical: 10,
-    marginRight: 15,
+    marginRight: 20,
   },
-  activeCategory: {
-    borderBottomWidth: 2,
-    borderBottomColor: "#ff8c00",
+  categoryImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#F5F5F5", // Nền xám nhạt mặc định
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  activeCategoryImageContainer: {
+    backgroundColor: "#F7E7CE", // Nền nhạt cho danh mục đang chọn
+    borderWidth: 2,
+    borderColor: "#F7E7CE", // Viền cam cho hiệu ứng active
   },
   categoryImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginBottom: 5,
+    width: 35,
+    height: 35,
   },
   categoryText: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: 12,
+    color: "#666", // Chữ xám mặc định
+    textAlign: "center",
   },
   activeCategoryText: {
-    color: "#ff8c00",
-    fontWeight: "bold",
+    color: "#964B00", // Chữ cam khi active
+    fontWeight: "600", // In đậm khi active
   },
+
   section: {
     marginHorizontal: 20,
     marginBottom: 20,

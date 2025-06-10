@@ -14,7 +14,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#333",
+        tabBarActiveTintColor: "#CB410B",
         tabBarInactiveTintColor: "#44362F",
         headerShown: false,
         tabBarStyle: {
@@ -42,13 +42,26 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bookmark-outline" color={color} size={size} />
           ),
-          tabBarItemStyle: user ? {} : { display: "none" }, // Show if user is logged in
+          tabBarItemStyle: user ? {} : { display: "none" },
         }}
       />
       <Tabs.Screen
         name="plus"
         options={{
           title: "Thêm",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add" color={color} size={size} />
+          ),
+          tabBarItemStyle:
+            user && user.role === "admin" && typeof user.role === "string"
+              ? {}
+              : { display: "none" },
+        }}
+      />
+      <Tabs.Screen
+        name="recipe-management"
+        options={{
+          title: "Edit Recipes",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add" color={color} size={size} />
           ),

@@ -39,7 +39,7 @@ interface Recipe {
 interface Comment {
   _id: string;
   content: string;
-  user: { _id: string; name: string };
+  user: { _id: string; username: string };
   createdAt?: string;
 }
 
@@ -100,7 +100,7 @@ const RecipeDetail = () => {
       console.error("Error toggling favorite:", error);
     }
   };
-  // RecipeDetail.tsx
+
   useEffect(() => {
     const fetchRecipe = async () => {
       try {
@@ -149,13 +149,13 @@ const RecipeDetail = () => {
       }
     };
 
-    // Làm mới bookmark khi user thay đổi
     if (id) {
       fetchRecipe();
       fetchComments();
       checkFavorite();
     }
-  }, [id, apiUrl, user, checkFavorite]); // Thêm user vào dependencies để làm mới khi user thay đổi
+  }, [id, apiUrl, user, checkFavorite]);
+
   useFocusEffect(
     useCallback(() => {
       checkFavorite();
@@ -272,7 +272,6 @@ const RecipeDetail = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <View style={styles.backButtonContainer}>
             <Feather name="arrow-left" size={20} color="#fff" />
-            <Text style={styles.backButtonText}>Back</Text>
           </View>
         </TouchableOpacity>
 
@@ -284,7 +283,7 @@ const RecipeDetail = () => {
             <Feather
               name="bookmark"
               size={24}
-              color={isFavorited ? "#ff4757" : "#fff"}
+              color={isFavorited ? "yellow" : "#fff"}
               fill={isFavorited ? "#ff4757" : "none"}
             />
           </TouchableOpacity>
@@ -335,7 +334,7 @@ const RecipeDetail = () => {
               ]}
             >
               <LinearGradient
-                colors={["#667eea", "#764ba2"]}
+                colors={["#F5F5DC", "#F5F5DC"]}
                 style={styles.statGradient}
               >
                 <Text style={styles.statIcon}>⏱️</Text>
@@ -354,7 +353,7 @@ const RecipeDetail = () => {
               ]}
             >
               <LinearGradient
-                colors={["#f093fb", "#f5576c"]}
+                colors={["#F7E7CE", "#F7E7CE"]}
                 style={styles.statGradient}
               >
                 <Text style={styles.statIcon}>📊</Text>
@@ -373,7 +372,7 @@ const RecipeDetail = () => {
               ]}
             >
               <LinearGradient
-                colors={["#4facfe", "#00f2fe"]}
+                colors={["#9F8170", "#EFDECD"]}
                 style={styles.statGradient}
               >
                 <Text style={styles.statIcon}>🔥</Text>
@@ -397,7 +396,7 @@ const RecipeDetail = () => {
           >
             <View style={styles.sectionHeader}>
               <LinearGradient
-                colors={["#ff9a56", "#ffad56"]}
+                colors={["#EFDECD", "#3B3C36"]}
                 style={styles.sectionIconContainer}
               >
                 <Text style={styles.sectionIcon}>⏰</Text>
@@ -562,7 +561,9 @@ const RecipeDetail = () => {
               {comments.length > 0 ? (
                 comments.map((comment, index) => (
                   <View key={index} style={styles.commentItem}>
-                    <Text style={styles.commentUser}>{comment.user.name}</Text>
+                    <Text style={styles.commentUser}>
+                      {comment.user.username}
+                    </Text>
                     <Text style={styles.commentContent}>{comment.content}</Text>
                     {comment.createdAt && (
                       <Text style={styles.commentTime}>
@@ -697,12 +698,11 @@ const styles = StyleSheet.create({
   backButtonContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   backButtonText: {
     fontSize: 16,
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(28, 27, 27, 0.2)",
   },
   contentContainer: {
     paddingHorizontal: 20,
@@ -748,8 +748,8 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
-    fontWeight: "600",
+    color: "#3B3C36",
+    fontWeight: "bold",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 8,
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#A52A2A",
     textAlign: "center",
   },
   section: {
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   },
   timerStartButton: {
     padding: 8,
-    backgroundColor: "#ff8c00",
+    backgroundColor: "#ff9a56",
     borderRadius: 15,
   },
   timerStartText: {
